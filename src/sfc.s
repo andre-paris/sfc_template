@@ -1,71 +1,38 @@
-;
-; Definition of the internal header and vectors at $00FFC0-$00FFFF
-; in the Super NES address space.
-;
-
   .include "sfc.inc"
 
-; LoROM is mapped to $808000-$FFFFFF in 32K blocks,
-; skipping a15 and a23. Most is mirrored down to $008000.
-MAPPER_LOROM = $20    ; a15 skipped
-; HiROM is mapped to $C00000-$FFFFFF linearly.
-; It is mirrored down to $400000, and the second half of
-; each 64K bank is mirrored to $008000 and $808000.
-MAPPER_HIROM = $21    ; C00000-FFFFFF skipping a22, a23
-; ExHiROM is mapped to $C00000-$FFFFFF followed by
-; $400000-$7FFFFF.  There are two inaccessible 32K holes
-; near the end, and two 32K blocks that are accessible only
-; through their mirrors to $3E8000 and $3F8000.
-MAPPER_EXHIROM = $25  ; skipping a22, inverting a23
-
-; If ROMSPEED_120NS is turned on, the game will be pressed
-; on more expensive "fast ROM" that allows the CPU to run
-; at its full 3.6 MHz when accessing ROM at $808000 and up.
-ROMSPEED_200NS = $00
-ROMSPEED_120NS = $10
-
-; ROM and backup RAM sizes are expressed as
-; ceil(log2(size in bytes)) - 10
-MEMSIZE_NONE  = $00
-MEMSIZE_2KB   = $01
-MEMSIZE_4KB   = $02
-MEMSIZE_8KB   = $03
-MEMSIZE_16KB  = $04
-MEMSIZE_32KB  = $05
-MEMSIZE_64KB  = $06
-MEMSIZE_128KB = $07  ; values from here up are for SRAM
-MEMSIZE_256KB = $08  ; values from here down are for ROM
-MEMSIZE_512KB = $09  ; Super Mario World
-MEMSIZE_1MB   = $0A  ; Mario Paint
-MEMSIZE_2MB   = $0B  ; Mega Man X, Super Mario All-Stars, original SF2
-MEMSIZE_4MB   = $0C  ; Turbo/Super SF2, all Donkey Kong Country
-MEMSIZE_8MB   = $0D  ; ExHiROM only: Tales of Phantasia, SF Alpha 2
-
-REGION_JAPAN = $00
-REGION_AMERICA = $01
-REGION_PAL = $02
+  .import __ZEROPAGE_RUN__
+  .import __MAPPER__
+  .import __REGION__
+  .import __ROMSIZE__
+  .import __ROMSPEED__
+  .import __SRAMSIZE__
+  .import __WRAMSIZE__
 
   .segment "SFCHEADER"
   .byte "  "          ; publisher ID, ASCII
   .byte "XLRW"        ; Game registration code (as in SNS-xxxx-USA)
   .res 6, $00         ; reserved
-  .byte MEMSIZE_NONE  ; log2(backup flash size) - 10
-  .byte MEMSIZE_NONE  ; log2(expansion work RAM size) - 10
+  .byte 0             ; log2(backup flash size) - 10
+  .byte __WRAMSIZE__  ; log2(expansion work RAM size) - 10
   .byte 0             ; related to promo versions
   .byte 0             ; Coprocessor subtype
 
 romname:
   ; The ROM name must be no longer than 21 characters.
-  .byte "MCS Checkers"
+  .byte "SFC Template"
   .assert * - romname <= 21, error, "ROM name too long"
   .if * - romname < 21
     .res romname + 21 - *, $20  ; space padding
   .endif
-  .byte MAPPER_LOROM|ROMSPEED_120NS
-  .byte $00   ; Cart type. 00: no extra RAM; 02: RAM with battery
-  .byte MEMSIZE_256KB  ; log2(ROM size) - 10; 08-0C typical
-  .byte MEMSIZE_NONE   ; log2(backup RAM size) - 10; 01,03,05 typical; Dezaemon has 07
-  .byte REGION_AMERICA
+  .byte __MAPPER__|__ROMSPEED__
+  .if __SRAMSIZE__ = 0
+  .byte $00           ; Cart type. 00: no extra RAM; 02: RAM with battery
+  .else
+  .byte $02
+  .endif
+  .byte __ROMSIZE__   ; log2(ROM size) - 10; 08-0C typical
+  .byte __SRAMSIZE__  ; log2(backup RAM size) - 10; 01,03,05 typical; Dezaemon has 07
+  .byte __REGION__
   .byte $33   ; Publisher ID, or $33 for see 16 bytes before header
   .byte $00   ; ROM revision number
   .word $0000 ; sum of all bytes will be poked here after linking
@@ -84,8 +51,7 @@ romname:
   
   .segment "CODE0"
 
-; Jumping out of bank $00 is especially important if you're using
-; ROMSPEED_120NS.
+; Jumping out of bank $00 is especially important if you're using ROMSPEED_120NS.
 nmistub:
   jml nmi_handler
 
@@ -101,8 +67,6 @@ eabort_handler:
 enmi_handler:
 eirq_handler:
   rti
-
-  .import __ZEROPAGE_RUN__
 
 ; Mask off low byte to allow use of $000000-$00000F as local variables
 ZEROPAGE_BASE   = __ZEROPAGE_RUN__ & $FF00
@@ -221,8 +185,8 @@ map_mode        = $00FFD5
   lda f:map_mode
   and #$10
   beq not_fastrom
-    inc a
-  not_fastrom:
+  inc a
+not_fastrom:
   sta MEMSEL24
 
   rep #$20
