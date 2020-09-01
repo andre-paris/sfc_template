@@ -21,7 +21,7 @@
   ; |+-------> 'w' if the register is writable for an effect
   ; +--------> 'r' if the register is readable for a value or effect (i.e. not [open bus](/open-bus)).
   .enum SFC
-  INIDISP	; Screen Display
+  INIDISP = $2100	; Screen Display
   ; $2100  wb++++
   ;          x---bbbb
   ;          x        = Force blank on when set.
@@ -574,7 +574,7 @@
   ; When read, the H/V counter (as read from $213c and $213d) will be latched to the current X and Y 
   ; position if bit 7 of $4201 is set. The data actually read is open bus.
 
-  OAMDATAREAD*	; Data for OAM read
+  OAMDATAREAD	; Data for OAM read
   ; 2138 r w++?- xxxxxxxx
 
   ; OAM reads are straightforward: the current byte as set in $2102/3 and incremented by reads from 
@@ -582,8 +582,8 @@
   ; affected so logically. See register $2104 and the section "SPRITES" below for details. Also, note 
   ; that OAM address invalidation probably affects the address read by this register as well.
 
-  VMDATALREAD*	; VRAM Data Read low byte
-  VMDATAHREAD*	; VRAM Data Read high byte
+  VMDATALREAD	; VRAM Data Read low byte
+  VMDATAHREAD	; VRAM Data Read high byte
   ; 2139 r l++?-
   ; 213a r h++?-
   ;         xxxxxxxx xxxxxxxx
@@ -597,7 +597,7 @@
   ; @see https://wiki.superfamicom.org/backgrounds
   ; @see https://wiki.superfamicom.org/sprites
 
-  CGDATAREAD*	; CGRAM Data read
+  CGDATAREAD	; CGRAM Data read
   ; 213b r w++?-
   ;         -bbbbbgg gggrrrrr
   ; This reads from CGRAM. Accesses to CGRAM are handled just like accesses to the low table of OAM, 
@@ -1153,60 +1153,60 @@
   .enum DMA
   ; Channel 0
   ; ----------
-  MODE0 = DMAP0
-  DST0  = BBAD0
-  SRC0  = A1T0L
-  BNK0  = A1B0
-  LEN0  = DAS0L
+  MODE0 = SFC::DMAP0
+  DST0  = SFC::BBAD0
+  SRC0  = SFC::A1T0L
+  BNK0  = SFC::A1B0
+  LEN0  = SFC::DAS0L
   ; Channel 1
   ; ----------
-  MODE1 = DMAP1
-  DST1  = BBAD1
-  SRC1  = A1T1L
-  BNK1  = A1B1
-  LEN1  = DAS1L
+  MODE1 = SFC::DMAP1
+  DST1  = SFC::BBAD1
+  SRC1  = SFC::A1T1L
+  BNK1  = SFC::A1B1
+  LEN1  = SFC::DAS1L
   ; Channel 2
   ; ----------
-  MODE2 = DMAP2
-  DST2  = BBAD2
-  SRC2  = A1T2L
-  BNK2  = A1B2
-  LEN2  = DAS2L
+  MODE2 = SFC::DMAP2
+  DST2  = SFC::BBAD2
+  SRC2  = SFC::A1T2L
+  BNK2  = SFC::A1B2
+  LEN2  = SFC::DAS2L
   ; Channel 3
   ; ----------
-  MODE3 = DMAP3
-  DST3  = BBAD3
-  SRC3  = A1T3L
-  BNK3  = A1B3
-  LEN3  = DAS3L
+  MODE3 = SFC::DMAP3
+  DST3  = SFC::BBAD3
+  SRC3  = SFC::A1T3L
+  BNK3  = SFC::A1B3
+  LEN3  = SFC::DAS3L
   ; Channel 4
   ; ----------
-  MODE4 = DMAP4
-  DST4  = BBAD4
-  SRC4  = A1T4L
-  BNK4  = A1B4
-  LEN4  = DAS4L
+  MODE4 = SFC::DMAP4
+  DST4  = SFC::BBAD4
+  SRC4  = SFC::A1T4L
+  BNK4  = SFC::A1B4
+  LEN4  = SFC::DAS4L
   ; Channel 5
   ; ----------
-  MODE5 = DMAP5
-  DST5  = BBAD5
-  SRC5  = A1T5L
-  BNK5  = A1B5
-  LEN5  = DAS5L
+  MODE5 = SFC::DMAP5
+  DST5  = SFC::BBAD5
+  SRC5  = SFC::A1T5L
+  BNK5  = SFC::A1B5
+  LEN5  = SFC::DAS5L
   ; Channel 6
   ; ----------
-  MODE6 = DMAP6
-  DST6  = BBAD6
-  SRC6  = A1T6L
-  BNK6  = A1B6
-  LEN6  = DAS6L
+  MODE6 = SFC::DMAP6
+  DST6  = SFC::BBAD6
+  SRC6  = SFC::A1T6L
+  BNK6  = SFC::A1B6
+  LEN6  = SFC::DAS6L
   ; Channel 7
   ; ----------
-  MODE7 = DMAP7
-  DST7  = BBAD7
-  SRC7  = A1T7L
-  BNK7  = A1B7
-  LEN7  = DAS7L
+  MODE7 = SFC::DMAP7
+  DST7  = SFC::BBAD7
+  SRC7  = SFC::A1T7L
+  BNK7  = SFC::A1B7
+  LEN7  = SFC::DAS7L
   .endenum
 
   ; Sprites sizes for OBSEL
@@ -1217,6 +1217,15 @@
   SIZE_16_32 = $60
   SIZE_16_64 = $80
   SIZE_32_64 = $A0
+  .endenum
+
+  ; Screens for TM
+  .enum TM
+  BG1 = (1 << 0)
+  BG2 = (1 << 1)
+  BG3 = (1 << 2)
+  BG4 = (1 << 3)
+  OBJ = (1 << 4)
   .endenum
 
   ; Options for M7SEL
@@ -1244,7 +1253,7 @@
   VTIME_IRQ  = $20
   HVTIME_IRQ = $30
   JOY_READ   = $01
-  .enum
+  .endenum
 
   ; Values read from JOYxL and JOYxH
   .enum JOY
@@ -1315,10 +1324,10 @@
   .macro PPU_VSync
   .local wait_clr, wait_set
 wait_clr:
-    bit HVBJOY  ; Wait for leaving previous vblank
+    bit SFC::HVBJOY  ; Wait for leaving previous vblank
     bmi wait_clr
 wait_set:
-    bit HVBJOY  ; Wait for start of this vblank
+    bit SFC::HVBJOY  ; Wait for start of this vblank
     bpl wait_set
   .endmac
 
@@ -1326,9 +1335,11 @@ wait_set:
   .local wait_pad
   lda #1
 wait_pad:
-  bit HVBJOY
+  bit SFC::HVBJOY
   bne wait_pad
   .endmac
+
+  .define RGB(r,g,b) ((r)|((g)<<5)|((b)<<10))
 
 ;--------------------------------------------------------------------------------------------------
 
@@ -1370,8 +1381,8 @@ oam_dmaReady =  oam+OAM::dmaReady
   ; Variables
   ; =========
 
-  .globalzp oam
   .globalzp joy
+  .global oam
 
 ;--------------------------------------------------------------------------------------------------
 

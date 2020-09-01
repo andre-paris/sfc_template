@@ -5,15 +5,20 @@
   .import __REGION__
   .import __ROMSIZE__
   .import __ROMSPEED__
-  .import __SRAMSIZE__
   .import __WRAMSIZE__
+  .import __SRAMSIZE__
+  .import __SRAMINSIDE__
+  .import Game_main, Game_nmi, Game_irq
+
+  ; Game Header
+  ; ===========
 
   .segment "SFCHEADER"
   .byte "  "          ; publisher ID, ASCII
   .byte "XLRW"        ; Game registration code (as in SNS-xxxx-USA)
   .res 6, $00         ; reserved
   .byte 0             ; log2(backup flash size) - 10
-  .byte __WRAMSIZE__  ; log2(expansion work RAM size) - 10
+  .byte <__WRAMSIZE__  ; log2(expansion work RAM size) - 10
   .byte 0             ; related to promo versions
   .byte 0             ; Coprocessor subtype
 
@@ -24,39 +29,40 @@ romname:
   .if * - romname < 21
     .res romname + 21 - *, $20  ; space padding
   .endif
-  .byte __MAPPER__|__ROMSPEED__
-  .if __SRAMSIZE__ = 0
-  .byte $00           ; Cart type. 00: no extra RAM; 02: RAM with battery
-  .else
-  .byte $02
-  .endif
-  .byte __ROMSIZE__   ; log2(ROM size) - 10; 08-0C typical
-  .byte __SRAMSIZE__  ; log2(backup RAM size) - 10; 01,03,05 typical; Dezaemon has 07
-  .byte __REGION__
-  .byte $33   ; Publisher ID, or $33 for see 16 bytes before header
-  .byte $00   ; ROM revision number
-  .word $0000 ; sum of all bytes will be poked here after linking
-  .word $0000 ; $FFFF minus above sum will also be poked here
+  .byte <(__MAPPER__|__ROMSPEED__)
+  .byte <__SRAMINSIDE__  ; Cart type. 00: no extra RAM; 02: RAM with battery
+  .byte <__ROMSIZE__     ; log2(ROM size) - 10; 08-0C typical
+  .byte <__SRAMSIZE__    ; log2(backup RAM size) - 10; 01,03,05 typical; Dezaemon has 07
+  .byte <__REGION__      ; Game region
+  .byte $33             ; Publisher ID, or $33 for see 16 bytes before header
+  .byte $00             ; ROM revision number
+  .word $0000           ; sum of all bytes will be poked here after linking
+  .word $0000           ; $FFFF minus above sum will also be poked here
   .res 4  ; unused vectors
   ; clcxce mode vectors
   ; reset unused because reset switches to 6502 mode
   .addr cop_handler, brk_handler, abort_handler
-  .addr nmistub, $FFFF, irq_handler
+  .addr nmi_handler, $FFFF, irq_handler
   .res 4  ; more unused vectors
   ; 6502 mode vectors
   ; brk unused because 6502 mode uses irq handler and pushes the
   ; X flag clear for /IRQ or set for BRK
   .addr ecop_handler, $FFFF, eabort_handler
-  .addr enmi_handler, resetstub, eirq_handler
+  .addr enmi_handler, reset, eirq_handler
   
+;--------------------------------------------------------------------------------------------------
+
+  ; Interrupt Handlers
+  ; ==================
+
   .segment "CODE0"
 
 ; Jumping out of bank $00 is especially important if you're using ROMSPEED_120NS.
-nmistub:
-  jml nmi_handler
+nmi_handler:
+  jml Game_nmi
 
-irqstub:
-  jml irq_handler
+irq_handler:
+  jml Game_irq
 
 ; Unused exception handlers
 cop_handler:
@@ -67,6 +73,11 @@ eabort_handler:
 enmi_handler:
 eirq_handler:
   rti
+
+;--------------------------------------------------------------------------------------------------
+
+  ; System Reset
+  ; ============
 
 ; Mask off low byte to allow use of $000000-$00000F as local variables
 ZEROPAGE_BASE   = __ZEROPAGE_RUN__ & $FF00
@@ -100,17 +111,17 @@ map_mode        = $00FFD5
 ; For advanced users: Long stretches of STZ are a useful place to
 ; shuffle code when watermarking your binary.
 
-  .proc resetstub
+  .proc reset
   sei                ; turn off IRQs
   clc
   xce                ; turn off 6502 emulation mode
   cld                ; turn off decimal ADC/SBC
-  jml reset_fastrom  ; Bank $00 is not fast, but its mirror $80 is
+  jml fastReset
   .endproc
 
   .segment "CODE"
   
-  .proc reset_fastrom
+  .proc fastReset
   rep #$30         ; 16-bit AXY
   ldx #LAST_STACK_ADDR
   txs              ; set the stack pointer
@@ -201,6 +212,127 @@ not_fastrom:
   ; * Fill shadow OAM and then copy it to OAM
   ; * Boot the S-SMP
   ; The main routine can do these in any order.
-  jml main
+  jml Game_main
   .endproc
 
+;--------------------------------------------------------------------------------------------------
+
+  ; OAM functions
+  ; =============
+
+  .segment "BSS"
+
+oam:  .tag OAM
+
+  .segment "CODE"
+
+  .proc OAM_update
+  jsl OAM_hideUnusedSprites
+  jsl OAM_compactHiTable
+  jml OAM_doDMA
+  .endproc
+
+  .proc OAM_compactHiTable
+  php
+  setai16
+  ;------------------ Compact OAM High Table to 32 bytes
+  ldx #0
+  txy
+  stx oam_idx
+packloop:
+  ; pack four sprites' size+xhi bits from oam_hi
+  sep #$20
+  lda oam_hi+13, y
+  asl a
+  asl a
+  ora oam_hi+9, y
+  asl a
+  asl a
+  ora oam_hi+5, y
+  asl a
+  asl a
+  ora oam_hi+1, y
+  sta oam_hi, x
+  rep #$21  ; seta16 + clc for following addition
+  ; move to the next set of 4 OAM entries
+  inx
+  tya
+  adc #16
+  tay
+  cpx #32
+  bcc packloop
+  ;------------------
+  plp
+  rtl
+  .endproc
+
+  .proc OAM_hideUnusedSprites
+  php
+  setai16
+  ldx oam_idx
+hide:
+  cpx #.sizeof(OAM::lo)
+  bcs return
+  lda #(225 << 8) | $ff   ; y=255 x=-1
+  sta oam_x, x
+  lda #$0100
+  sta oam_hi, x
+  .repeat 4
+  inx
+  .endrep
+  jmp hide
+return:
+  plp
+  rtl
+  .endproc
+
+  .proc OAM_doDMA
+  php
+  seta8
+  seti16
+  stz oam_dmaReady
+  ldx #$0000
+  stx SFC::OAMADDL
+  stz DMA::MODE0
+  lda #<SFC::OAMDATA
+  sta DMA::DST0
+  ldx #.loword(oam_lo)
+  stx DMA::SRC0
+  lda #.bankbyte(oam_lo)
+  sta DMA::BNK0
+  ldx #544
+  stx DMA::LEN0
+  lda #1
+  sta oam_dmaReady
+  plp
+  rtl
+  .endproc
+
+;--------------------------------------------------------------------------------------------------
+
+  ; Joypad functions
+  ; ================
+
+  .segment "ZEROPAGE"
+
+joy:    .tag Joy
+
+  .segment "CODE"
+
+  .proc Joy_update
+  php
+  seta16
+  Joy_WaitPoll
+  lda joy_curState+0
+  sta joy_prvState+0
+  lda joy_curState+2
+  sta joy_prvState+2
+  lda SFC::JOY1L
+  sta joy_curState+0
+  lda SFC::JOY2L
+  sta joy_curState+2
+  plp
+  rtl
+  .endproc
+
+;--------------------------------------------------------------------------------------------------

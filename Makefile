@@ -1,12 +1,11 @@
-ROMNAME = checkers.sfc
+ROMNAME = game.sfc
 BOARD = lorom256kb
 
 PROJECT_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
 PROJECT_DIR := $(PROJECT_DIR:/=)
 PROJECT_SRC = $(PROJECT_DIR)/src
 PROJECT_OBJ = $(PROJECT_DIR)/obj
-PROJECT_INC = $(PROJECT_DIR)/include
-PROJECT_ASM = $(PROJECT_DIR)/inc
+PROJECT_INC = $(PROJECT_DIR)/inc
 PROJECT_CFG = $(PROJECT_DIR)/cfg
 EMUEXE = mesen-s
 EMUOPT = 2>/dev/null
@@ -14,7 +13,7 @@ MAP = $(ROMNAME:.sfc=.m)
 DBG = $(ROMNAME:.sfc=.dbg)
 CA = ca65
 LD = ld65
-AFLAGS = -I $(PROJECT_ASM) -g --large-alignment
+AFLAGS = -I $(PROJECT_INC) -g --large-alignment
 
 rwildcard=$(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2) $(filter $(subst *,%,$2),$d))
 SOURCES = $(call rwildcard, $(PROJECT_SRC), *.s)
@@ -56,7 +55,7 @@ $(PROJECT_OBJ)%/.:
 .PHONY: alloc clean
 
 alloc:
-	java -jar res/tool/pa65.jar -d -t -o $(PROJECT_ASM)/pa65.inc $(SOURCES)
+	# java -jar res/tool/pa65.jar -d -t -o $(PROJECT_INC)/pa65.inc $(SOURCES)
 
 clean:
 	$(RM) $(OBJS) $(DBG) $(MAP) $(ROMNAME)
