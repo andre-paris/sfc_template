@@ -1,0 +1,9 @@
+.vscode/ipch
+obj/
+history/
+game.*
+*.m
+*.bin
+*.sfc
+!src/game.*
+!inc/game.*
