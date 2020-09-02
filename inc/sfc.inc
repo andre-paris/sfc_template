@@ -1210,7 +1210,7 @@
   .endenum
 
   ; Sprites sizes for OBSEL
-  .enum OB
+  .enum OBSEL
   SIZE_8_16  = $00
   SIZE_8_32  = $20
   SIZE_8_64  = $40
@@ -1229,7 +1229,7 @@
   .endenum
 
   ; Options for M7SEL
-  .enum M7
+  .enum M7SEL
   HFLIP    = $01
   VFLIP    = $02
   WRAP     = $00
@@ -1238,7 +1238,7 @@
   .endenum
 
   ; Options for VMAIN
-  .enum VM
+  .enum VMAIN
   INC_BY_1
   INC_BY_32
   INC_BY_128
